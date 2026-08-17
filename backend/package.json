@@ -1,0 +1,19 @@
+{
+  "name": "dubs-crm-backend",
+  "version": "1.0.0",
+  "description": "D.U.B.S CRM backend — organisations, users, leads, activities, reports.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test_phase9_data_foundation.js && node test_phase9b_gap_closure.js && node test_provisioning.js && node test_pin_bridge.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
