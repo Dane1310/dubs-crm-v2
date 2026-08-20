@@ -1,10 +1,20 @@
 const express = require('express');
-const { seedPermissionsAndDefaultRoles } = require('./permissions');
+const { restoreFromTurso, startPeriodicSave, registerShutdownSave } = require('./turso-persist');
 
-seedPermissionsAndDefaultRoles(); // idempotent — safe to run on every boot
+// MUST run before anything below requires ./permissions or ./db — both
+// of those open the local SQLite file the moment they're required. If a
+// Turso snapshot needs to be restored, it has to land on disk before
+// that require happens, or db.js opens an empty file and the restore is
+// pointless. This is the only reason this file's require order looks
+// unusual — everything else about server.js is unchanged.
+(async () => {
+  await restoreFromTurso();
 
-const app = express();
-app.use(express.json());
+  const { seedPermissionsAndDefaultRoles } = require('./permissions');
+  seedPermissionsAndDefaultRoles(); // idempotent — safe to run on every boot
+
+  const app = express();
+  app.use(express.json());
 
 // CORS: required for a browser-hosted frontend (a different origin, e.g. a
 // Claude artifact or any deployed site) to call this API at all — without
@@ -59,4 +69,15 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Foundation API listening on :${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`Foundation API listening on :${PORT}`);
+    // Only start once the server is actually listening — no point saving
+    // before there's anything meaningful running. Both are safe no-ops if
+    // TURSO_DATABASE_URL/TURSO_AUTH_TOKEN aren't set (see turso-persist.js).
+    startPeriodicSave();
+    registerShutdownSave();
+  });
+})().catch((err) => {
+  console.error('[server] Fatal error during startup:', err);
+  process.exit(1);
+});
