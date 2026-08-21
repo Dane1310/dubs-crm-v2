@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test_phase9_data_foundation.js && node test_phase9b_gap_closure.js && node test_provisioning.js && node test_pin_bridge.js && node test_turso_persist.js"
+    "test": "node test_phase9_data_foundation.js && node test_phase9b_gap_closure.js && node test_provisioning.js && node test_pin_bridge.js && node test_turso_persist.js && node test_clock_sessions.js"
   },
   "engines": {
     "node": ">=22.5.0"

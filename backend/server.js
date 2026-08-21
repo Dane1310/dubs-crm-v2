@@ -61,6 +61,7 @@ app.use('/api', require('./routes/search'));
 app.use('/api', require('./routes/tasks'));
 app.use('/api', require('./routes/contacts'));
 app.use('/api', require('./routes/backup'));
+app.use('/api', require('./routes/clock'));
 
 // Basic malformed-input / unknown-route safety net — never leak stack traces.
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

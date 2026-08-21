@@ -237,4 +237,24 @@ if (!userCols.includes('pin_salt')) {
   db.exec(`ALTER TABLE users ADD COLUMN pin_salt TEXT;`);
 }
 
+// Clock-in/out: a simple append-mostly table of shift sessions, one open
+// row (clock_out_at IS NULL) per user at a time. New table via CREATE TABLE
+// IF NOT EXISTS, same non-destructive pattern as everything else in this
+// file -- safe against an existing foundation.db (including one restored
+// from a Turso snapshot taken before this feature existed).
+db.exec(`
+CREATE TABLE IF NOT EXISTS clock_sessions (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  clock_in_at TEXT NOT NULL,
+  clock_out_at TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (organisation_id) REFERENCES organisations(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_clock_sessions_open
+  ON clock_sessions (organisation_id, user_id, clock_out_at);
+`);
+
 module.exports = db;
