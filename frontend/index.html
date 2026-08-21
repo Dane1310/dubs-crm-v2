@@ -249,6 +249,7 @@
   <button data-tab="myday" class="active">My day</button>
   <button data-tab="dailylog">Work log</button>
   <button data-tab="pipeline">Pipeline</button>
+  <button data-tab="clock">Clock in/out</button>
   <button data-tab="dashboard">Manager dashboard</button>
   <button data-tab="leaderboard">Leaderboard</button>
   <button data-tab="dme">DME report</button>
@@ -394,6 +395,26 @@
   </div>
   <div class="card" style="padding:0; overflow-x:auto;">
     <table id="pipelineTable"></table>
+  </div>
+</div>
+
+<div id="tab-clock" style="display:none;">
+  <h2>Clock in / out</h2>
+  <div class="empty" style="margin-bottom:12px;">Enter your name and PIN at the top of the page, same as any other action here — clocking in/out is verified against the real backend, not stored locally, so your hours are attributable to your actual account.</div>
+  <div class="card" style="padding:16px; margin-bottom:16px;">
+    <div id="clockStatusLine" style="font-size:14px; font-weight:600; margin-bottom:12px;">Click Clock In, Clock Out, or Refresh status below.</div>
+    <div class="form-row" style="grid-template-columns:auto auto auto; gap:8px;">
+      <button onclick="doClockIn()">Clock In</button>
+      <button onclick="doClockOut()">Clock Out</button>
+      <button onclick="refreshClockStatus()">Refresh status</button>
+    </div>
+  </div>
+  <h2>My hours <span style="font-size:11px; color:var(--muted); font-weight:400;">most recent first</span></h2>
+  <div class="card" style="padding:0; overflow-x:auto;">
+    <table>
+      <thead><tr><th>Date</th><th>Clocked in</th><th>Clocked out</th><th>Duration</th></tr></thead>
+      <tbody id="clockHistoryTable"><tr><td class="muted">Click Refresh status to load.</td></tr></tbody>
+    </table>
   </div>
 </div>
 
@@ -1731,6 +1752,96 @@ async function logActivity(){
   document.getElementById('log-followup').value='';
   showToast('Engagement logged');
   renderAll();
+}
+
+// Clock in/out — same self-service PIN-verified pattern as logActivity()
+// above: currentPinOk() is the gate, beAgentApi is the same client (and
+// same session cache) already used for every other agent-facing backend
+// call. No local-only fallback — if the backend can't be reached, nothing
+// is recorded and the agent sees a clear error, same fail-closed rule as
+// the rest of this file. clockStatusCache is deliberately NOT refreshed
+// automatically on a timer (unlike renderMyDay etc., which just re-read
+// the local LEADS cache) — refreshing status means a real PIN-verified
+// backend call, so it only happens on an explicit action here: Clock In,
+// Clock Out, or Refresh status.
+let clockStatusCache = null;
+
+function renderClockTab(){
+  const el = document.getElementById('clockStatusLine');
+  if(!el) return;
+  const me = canonName(document.getElementById('myName').value);
+  if(!me){ el.textContent = 'Enter your name above first.'; return; }
+  if(!clockStatusCache){ el.textContent = 'Click Clock In, Clock Out, or Refresh status below.'; return; }
+  el.innerHTML = clockStatusCache.clockedIn
+    ? `<span style="color:var(--green);">● Clocked in</span> since ${new Date(clockStatusCache.session.clock_in_at).toLocaleTimeString()}`
+    : '<span style="color:var(--muted);">○ Not currently clocked in</span>';
+}
+
+function renderClockHistoryTable(rows){
+  const tbody = document.getElementById('clockHistoryTable');
+  if(!rows || !rows.length){ tbody.innerHTML = '<tr><td class="muted">No shifts recorded yet.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r=>{
+    const inT = new Date(r.clock_in_at);
+    const outT = r.clock_out_at ? new Date(r.clock_out_at) : null;
+    const durMins = Math.round(((outT || new Date()) - inT) / 60000);
+    return `<tr><td>${inT.toLocaleDateString()}</td><td>${inT.toLocaleTimeString()}</td><td>${outT ? outT.toLocaleTimeString() : '(still open)'}</td><td>${fmtMinutes(durMins)}</td></tr>`;
+  }).join('');
+}
+
+async function doClockIn(){
+  const auth = await currentPinOk();
+  if(!auth.ok){ showToast(auth.message || 'Enter your PIN first'); return; }
+  beAgentApi.setToken(auth.token);
+  try{
+    const session = await beAgentApi.clockIn();
+    clockStatusCache = { clockedIn:true, session };
+    showToast('Clocked in');
+    await logAudit(canonName(document.getElementById('myName').value), 'Clock in', '');
+  }catch(e){
+    showToast(e.status === 409 ? 'You are already clocked in.' : (e.message || 'Could not reach the backend — nothing was recorded.'));
+  }
+  renderClockTab();
+  loadClockHistory();
+}
+
+async function doClockOut(){
+  const auth = await currentPinOk();
+  if(!auth.ok){ showToast(auth.message || 'Enter your PIN first'); return; }
+  beAgentApi.setToken(auth.token);
+  try{
+    const session = await beAgentApi.clockOut();
+    clockStatusCache = { clockedIn:false, session };
+    showToast('Clocked out');
+    await logAudit(canonName(document.getElementById('myName').value), 'Clock out', '');
+  }catch(e){
+    showToast(e.status === 409 ? 'You are not currently clocked in.' : (e.message || 'Could not reach the backend — nothing was recorded.'));
+  }
+  renderClockTab();
+  loadClockHistory();
+}
+
+async function refreshClockStatus(){
+  const auth = await currentPinOk();
+  if(!auth.ok){ showToast(auth.message || 'Enter your PIN first'); return; }
+  beAgentApi.setToken(auth.token);
+  try{
+    clockStatusCache = await beAgentApi.clockStatus();
+  }catch(e){
+    showToast(e.message || 'Could not reach the backend — try again.');
+    return;
+  }
+  renderClockTab();
+  loadClockHistory();
+}
+
+async function loadClockHistory(){
+  const auth = await currentPinOk();
+  if(!auth.ok) return; // silent here — doClockIn/doClockOut/refreshClockStatus already toasted the reason
+  beAgentApi.setToken(auth.token);
+  try{
+    const rows = await beAgentApi.clockHistory();
+    renderClockHistoryTable(rows);
+  }catch(e){ /* silent — history is a nice-to-have, not the primary action's own error */ }
 }
 
 function countActivity(agent, dateStr){
@@ -3076,6 +3187,7 @@ function renderAll(){
   renderMyDay();
   renderDailyLog();
   renderPipeline();
+  renderClockTab();
   renderDashboard();
   renderLeaderboard();
   updateLoginStatus();
@@ -3101,7 +3213,7 @@ document.querySelectorAll('nav button').forEach(btn=>{
   btn.addEventListener('click', async ()=>{
     document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    ['myday','dailylog','pipeline','dashboard','leaderboard','dme','owner','backend'].forEach(t=>{
+    ['myday','dailylog','pipeline','clock','dashboard','leaderboard','dme','owner','backend'].forEach(t=>{
       document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab) ? 'block' : 'none';
     });
     if(btn.dataset.tab==='dashboard' && !(await canSeeManagerDashboard())){
@@ -3211,6 +3323,14 @@ function makeApiClient(baseUrl){
       const qs = params ? '?'+new URLSearchParams(params).toString() : '';
       return request('/tasks'+qs);
     },
+    // Clock in/out — every PIN agent acts on their own attendance only,
+    // same self-service model as logActivity()/addLead(): the token
+    // resolved by currentPinOk()/beEnsureAgentSession() IS the identity,
+    // there is no separate "who am I clocking in" parameter to spoof.
+    clockStatus: ()=> request('/clock/status'),
+    clockIn: ()=> request('/clock/in', {method:'POST'}),
+    clockOut: ()=> request('/clock/out', {method:'POST'}),
+    clockHistory: ()=> request('/clock/history'),
   };
 }
 
