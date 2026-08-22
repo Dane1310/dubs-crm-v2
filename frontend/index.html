@@ -1121,7 +1121,15 @@ let loaded = false;
 // Security Alerts table) on every blocked attempt, same pattern already
 // used for the Manager Dashboard tab.
 function requireOwner(actionLabel){
-  if(ownerUnlocked) return true;
+  // A real backend login as OWNER (the "D.U.B.S CRM (connected)" tab,
+  // email+password, server-verified role) is proof of ownership just as
+  // strong as the local Owner-PIN unlock — arguably stronger, since it
+  // required real credentials checked by the server. Previously only the
+  // local PIN counted here, so every owner-only action (Provision agent,
+  // Set agent PIN, Download backup, etc.) stayed blocked even for someone
+  // already logged in as the real, backend-verified Owner. See
+  // beConnectedOwner, set by beShowLoggedIn()/cleared by beLogout().
+  if(ownerUnlocked || beConnectedOwner) return true;
   const who = canonName(document.getElementById('myName').value) || '(no name entered)';
   logAudit(who, 'SECURITY ALERT', `Attempted restricted action without owner access: ${actionLabel}`);
   showToast('Owner access required for this action');
@@ -3335,6 +3343,7 @@ function makeApiClient(baseUrl){
 }
 
 let beApi = null;
+let beConnectedOwner = false; // true once beShowLoggedIn() sees role === 'OWNER' from the real backend — see requireOwner()
 let beOrgId = null; // captured from GET /me on owner/manager login — see beShowLoggedIn()
 let beAgentApi = null; // SEPARATE client/token from beApi — floor PIN-agent sessions must never
                         // clobber the Backend Sync tab's own logged-in session, and vice versa.
@@ -3458,6 +3467,7 @@ async function beLogin(){
 async function beLogout(){
   try{ await beApi.logout(); }catch(e){}
   try{ await window.storage.set('be-token', '', false); }catch(e){}
+  beConnectedOwner = false;
   document.getElementById('be-main').style.display = 'none';
   document.getElementById('be-register-card').style.display = 'block';
   const provCard = document.getElementById('be-provision-card');
@@ -3470,7 +3480,8 @@ function beShowLoggedIn(me){
   document.getElementById('be-main').style.display = 'block';
   document.getElementById('be-register-card').style.display = 'none';
   const provCard = document.getElementById('be-provision-card');
-  if(provCard) provCard.style.display = (me.role === 'OWNER') ? 'block' : 'none';
+  beConnectedOwner = (me.role === 'OWNER');
+  if(provCard) provCard.style.display = beConnectedOwner ? 'block' : 'none';
   // Capture + persist the organisation id from whoever's logged in here —
   // this is what lets the PIN floor workflow authenticate agents against
   // the right org without asking anyone to type/paste an id anywhere.
@@ -3503,14 +3514,14 @@ function beShowLoggedIn(me){
 let beAgentLastAuthWasOffline = false; // set by currentPinOk() callers to distinguish "wrong PIN" from "can't reach the server" — never silently treat the latter as the former.
 async function beEnsureAgentSession(name, pin){
   if(!beOrgId || !beAgentApi || !name || !pin){ beAgentLastAuthWasOffline = !beOrgId; return null; }
-  const cached = beAgentSessionCache[name + '::' + pin];
+  const cached = beAgentSessionCache[name];
   if(cached && cached.expiresAt && new Date(cached.expiresAt) > new Date(Date.now()+60000)){
     beAgentLastAuthWasOffline = false;
     return cached.token;
   }
   try{
     const r = await beAgentApi.pinLogin(beOrgId, name, pin);
-    beAgentSessionCache[name + '::' + pin] = { token: r.token, expiresAt: r.expiresAt };
+    beAgentSessionCache[name] = { token: r.token, expiresAt: r.expiresAt };
     beAgentLastAuthWasOffline = false;
     return r.token;
   }catch(e){
