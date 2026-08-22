@@ -3503,14 +3503,14 @@ function beShowLoggedIn(me){
 let beAgentLastAuthWasOffline = false; // set by currentPinOk() callers to distinguish "wrong PIN" from "can't reach the server" — never silently treat the latter as the former.
 async function beEnsureAgentSession(name, pin){
   if(!beOrgId || !beAgentApi || !name || !pin){ beAgentLastAuthWasOffline = !beOrgId; return null; }
-  const cached = beAgentSessionCache[name];
+  const cached = beAgentSessionCache[name + '::' + pin];
   if(cached && cached.expiresAt && new Date(cached.expiresAt) > new Date(Date.now()+60000)){
     beAgentLastAuthWasOffline = false;
     return cached.token;
   }
   try{
     const r = await beAgentApi.pinLogin(beOrgId, name, pin);
-    beAgentSessionCache[name] = { token: r.token, expiresAt: r.expiresAt };
+    beAgentSessionCache[name + '::' + pin] = { token: r.token, expiresAt: r.expiresAt };
     beAgentLastAuthWasOffline = false;
     return r.token;
   }catch(e){
