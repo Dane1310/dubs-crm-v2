@@ -846,7 +846,7 @@ Issued by: ___________  Date: ___________</div>
       Backend URL — change this once the backend is actually deployed somewhere reachable. Defaults to a local address for testing only.
     </div>
     <div class="form-row">
-      <div><label>Backend API base URL</label><input id="be-baseurl" value="https://dubs-crm-backend.onrender.com/api"></div>
+      <div><label>Backend API base URL</label><input id="be-baseurl" value="https://dubs-crm-v2.onrender.com/api"></div>
       <div><label style="visibility:hidden;">.</label><button onclick="beSaveBaseUrl()" style="width:100%;">Save URL</button></div>
     </div>
   </div>
@@ -3357,7 +3357,7 @@ async function beInit(){
   try{ const r = await window.storage.get('be-baseurl', false); savedUrl = r ? r.value : null; }catch(e){}
   try{ const r = await window.storage.get('be-token', false); savedToken = r ? r.value : null; }catch(e){}
   try{ const r = await window.storage.get('be-organisation-id', false); savedOrgId = r ? r.value : null; }catch(e){}
-  document.getElementById('be-baseurl').value = savedUrl || 'https://dubs-crm-backend.onrender.com/api';
+  document.getElementById('be-baseurl').value = savedUrl || 'https://dubs-crm-v2.onrender.com/api';
   beApi = makeApiClient(document.getElementById('be-baseurl').value);
   beAgentApi = makeApiClient(document.getElementById('be-baseurl').value);
   beOrgId = savedOrgId || null;
