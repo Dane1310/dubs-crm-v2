@@ -3481,6 +3481,13 @@ function beShowLoggedIn(me){
   document.getElementById('be-register-card').style.display = 'none';
   const provCard = document.getElementById('be-provision-card');
   beConnectedOwner = (me.role === 'OWNER');
+      if(beConnectedOwner){
+      const ol = document.getElementById('ownerLocked');
+      const op = document.getElementById('ownerPanel');
+      if(ol) ol.style.display = 'none';
+      if(op) op.style.display = 'block';
+      if(typeof renderOwnerPanel === 'function') renderOwnerPanel();
+    }
   if(provCard) provCard.style.display = beConnectedOwner ? 'block' : 'none';
   // Capture + persist the organisation id from whoever's logged in here —
   // this is what lets the PIN floor workflow authenticate agents against
