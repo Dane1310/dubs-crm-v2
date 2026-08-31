@@ -56,17 +56,17 @@ function findByIdScoped(userId, organisationId) {
 }
 
 function listByOrganisation(organisationId) {
-  return db.prepare(`SELECT id, email, role_id, status, display_name, created_at FROM users WHERE organisation_id = ?`).all(organisationId);
+  return db.prepare(`SELECT id, email, role_id, status, display_name, crm_title, created_at FROM users WHERE organisation_id = ?`).all(organisationId);
 }
 
 function getPublicByIdScoped(userId, organisationId) {
-  return db.prepare(`SELECT id, email, role_id, status, display_name, created_at FROM users WHERE id = ? AND organisation_id = ?`).get(userId, organisationId) || null;
+  return db.prepare(`SELECT id, email, role_id, status, display_name, crm_title, created_at FROM users WHERE id = ? AND organisation_id = ?`).get(userId, organisationId) || null;
 }
 
 function updateScoped(id, organisationId, patch) {
   const existing = findByIdScoped(id, organisationId);
   if (!existing) return null;
-  const allowed = ['role_id', 'status'];
+  const allowed = ['role_id', 'status', 'crm_title'];
   const sets = [];
   const values = [];
   for (const key of allowed) {
