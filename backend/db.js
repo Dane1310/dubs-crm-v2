@@ -213,13 +213,16 @@ if (!activityCols.includes('sentiment')) {
 // owner_user_id). Nullable/non-destructive ALTER, same pattern as above.
 const userCols = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
 if (!userCols.includes('display_name')) {
-  db.exec(`ALTER TABLE users ADD COLUMN display_name TEXT;`);
+db.exec(`ALTER TABLE users ADD COLUMN display_name TEXT;`);
+}
+if (!userCols.includes('crm_title')) {
+db.exec(`ALTER TABLE users ADD COLUMN crm_title TEXT;`);
 }
 if (!userCols.includes('provisioned_from')) {
-  // Traceability: how this user record came to exist — 'registration'
-  // (normal signup) vs 'roster_provisioning' (created by
-  // provision_agents.js from a floor-agent name with no login intended).
-  db.exec(`ALTER TABLE users ADD COLUMN provisioned_from TEXT;`);
+// Traceability: how this user record came to exist — 'registration'
+// (normal signup) vs 'roster_provisioning' (created by
+// provision_agents.js from a floor-agent name with no login intended).
+db.exec(`ALTER TABLE users ADD COLUMN provisioned_from TEXT;`);
 }
 
 // PIN-agent identity bridge: lets a roster-provisioned user (status
